@@ -1,0 +1,6 @@
+{
+  "name": "Etsy & Amazon Listing Optimizer",
+  "description": "Optimize Etsy and Amazon product titles, descriptions, and tags for better search rankings using Google Gemini API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
