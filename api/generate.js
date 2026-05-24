@@ -1,7 +1,6 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GoogleGenAI, Type } from "@google/genai";
+const { GoogleGenAI, Type } = require("@google/genai");
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+module.exports = async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
@@ -79,8 +78,8 @@ Return ONLY valid JSON matching the schema requirements. Ensure:
     // Safe JSON parsing of schema forced output
     const jsonResponse = JSON.parse(resultText.trim());
     return res.json(jsonResponse);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error generating listing:", error);
     return res.status(500).json({ error: error.message || "An error occurred during listing generation." });
   }
-}
+};
