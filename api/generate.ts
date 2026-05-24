@@ -35,7 +35,7 @@ Return ONLY valid JSON matching the schema requirements. Ensure:
 3. Tags includes exactly 13 tags, each under 20 characters, optimized for search engines.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         systemInstruction: "You are an expert Etsy and Amazon SEO specialist. Generate optimized product listings that rank high in search.",
