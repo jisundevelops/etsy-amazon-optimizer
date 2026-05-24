@@ -1,10 +1,5 @@
 {
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/generate.js": {
-      "runtime": "nodejs22.x"
-    }
-  }
+  ]
 }
