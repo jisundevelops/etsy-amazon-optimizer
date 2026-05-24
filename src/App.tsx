@@ -497,7 +497,7 @@ export default function App() {
                 </h3>
                 <p className="text-xs text-slate-400 mt-2 max-w-sm font-medium">
                   {generateMode === "compare" 
-                    ? <>Running <strong className="text-slate-600">DeepSeek V4 Flash</strong>, <strong className="text-slate-600">Llama 3.3 70B</strong>, and <strong className="text-slate-600">Qwen3 32B</strong> in parallel...</>
+                    ? <>Running <strong className="text-slate-600">DeepSeek V4 Flash</strong>, <strong className="text-slate-600">Llama 3.3 70B</strong>, and <strong className="text-slate-600">Qwen3 Next 80B</strong> in parallel...</>
                     : <>Applying platform-specific guidelines for <strong className="text-slate-600">{platform === "Both" ? "Etsy & Amazon" : platform}</strong> using <strong className="text-slate-600">{getModelName(selectedModel)}</strong>.</>
                   }
                 </p>
@@ -513,7 +513,7 @@ export default function App() {
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400">
                       <div className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin shrink-0" />
-                      <span>Qwen3 32B generating...</span>
+                      <span>Qwen3 Next 80B generating...</span>
                     </div>
                   </div>
                 )}
@@ -707,7 +707,7 @@ export default function App() {
       {/* FOOTER */}
       <footer className="mt-20 border-t border-slate-200 pt-8 text-center px-4 max-w-6xl mx-auto w-full">
         <p className="text-xs text-slate-400 font-medium">
-          Multi-AI SEO Optimizer • DeepSeek V4 Flash • Llama 3.3 70B • Qwen3 32B • Powered by OpenRouter
+          Multi-AI SEO Optimizer • DeepSeek V4 Flash • Llama 3.3 70B • Qwen3 Next 80B • Powered by OpenRouter
         </p>
         <p className="text-[10px] text-slate-300 mt-2 font-mono">
           Etsy & Amazon Listing Optimizer • {new Date().getFullYear()}

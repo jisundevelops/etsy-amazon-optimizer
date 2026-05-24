@@ -63,8 +63,7 @@ Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
           { role: "user", content: userPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 2048,
-        response_format: { type: "json_object" }
+        max_tokens: 2048
       })
     });
 
@@ -81,7 +80,12 @@ Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
       throw new Error("No response received from AI model.");
     }
 
-    const jsonResponse = JSON.parse(content.trim());
+    // Strip markdown code blocks if present
+    let cleanContent = content.trim();
+    if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+    const jsonResponse = JSON.parse(cleanContent.trim());
 
     if (!jsonResponse.title || !jsonResponse.description || !jsonResponse.tags) {
       throw new Error("Invalid response format from AI model.");

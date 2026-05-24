@@ -66,8 +66,7 @@ Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
               { role: "user", content: userPrompt }
             ],
             temperature: 0.7,
-            max_tokens: 2048,
-            response_format: { type: "json_object" }
+            max_tokens: 2048
           })
         });
 
@@ -83,7 +82,12 @@ Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
           throw new Error(`No response from ${modelKey}`);
         }
 
-        const parsed = JSON.parse(content.trim());
+        // Strip markdown code blocks if present
+        let cleanContent = content.trim();
+        if (cleanContent.startsWith('```')) {
+          cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+        }
+        const parsed = JSON.parse(cleanContent.trim());
 
         if (!parsed.title || !parsed.description || !parsed.tags) {
           throw new Error(`Invalid format from ${modelKey}`);
@@ -154,8 +158,7 @@ Score each listing (0-100) for title, description, tags, and overall. Pick the b
             { role: "user", content: judgeUserPrompt }
           ],
           temperature: 0.3,
-          max_tokens: 1024,
-          response_format: { type: "json_object" }
+          max_tokens: 1024
         })
       });
 
@@ -163,7 +166,11 @@ Score each listing (0-100) for title, description, tags, and overall. Pick the b
         const judgeData = await judgeResponse.json();
         const judgeContent = judgeData.choices?.[0]?.message?.content;
         if (judgeContent) {
-          bestPick = JSON.parse(judgeContent.trim());
+          let judgeClean = judgeContent.trim();
+          if (judgeClean.startsWith('```')) {
+            judgeClean = judgeClean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+          }
+          bestPick = JSON.parse(judgeClean.trim());
         }
       }
     } catch (e) {
