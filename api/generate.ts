@@ -67,17 +67,23 @@ Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
       })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData?.error?.message || `OpenRouter API error: ${response.status}`;
-      throw new Error(errorMessage);
+      const errorMsg = data?.error?.message || data?.error?.code || `OpenRouter API error: ${response.status}`;
+      const errorCode = data?.error?.code || '';
+      throw new Error(`OpenRouter error (${errorCode}): ${errorMsg} | Model: ${selectedModel}`);
     }
 
-    const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new Error("No response received from AI model.");
+      // Check if provider returned an error inside a 200 response
+      const providerError = data?.error?.message || data?.choices?.[0]?.error?.message;
+      if (providerError) {
+        throw new Error(`Provider error: ${providerError} | Model: ${selectedModel}`);
+      }
+      throw new Error(`No response from model ${selectedModel}. Full response: ${JSON.stringify(data).slice(0, 300)}`);
     }
 
     // Strip markdown code blocks if present
