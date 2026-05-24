@@ -55,7 +55,7 @@ const CATEGORIES = [
 const AI_MODELS: { key: AIModel; name: string; badge: string; color: string }[] = [
   { key: "deepseek-v4-flash", name: "DeepSeek V4 Flash", badge: "Best Reasoning", color: "bg-blue-500" },
   { key: "llama-3.3-70b", name: "Llama 3.3 70B", badge: "Most Balanced", color: "bg-purple-500" },
-  { key: "qwen3-32b", name: "Qwen3 32B", badge: "Fast & Smart", color: "bg-orange-500" }
+  { key: "qwen3-32b", name: "Qwen3 Next 80B", badge: "Fast & Smart", color: "bg-orange-500" }
 ];
 
 export default function App() {

@@ -17,9 +17,9 @@ export default async function handler(req, res) {
     }
 
     const MODELS = {
-      "deepseek-v4-flash": "deepseek/deepseek-chat-v3-0324:free",
+      "deepseek-v4-flash": "deepseek/deepseek-v4-flash:free",
       "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct:free",
-      "qwen3-32b": "qwen/qwen3-32b:free"
+      "qwen3-32b": "qwen/qwen3-next-80b-a3b-instruct:free"
     };
 
     const systemPrompt = `You are an expert Etsy and Amazon SEO specialist. Generate optimized product listings that rank high in search.
@@ -148,7 +148,7 @@ Score each listing (0-100) for title, description, tags, and overall. Pick the b
           "X-Title": "Etsy & Amazon Listing Optimizer"
         },
         body: JSON.stringify({
-          model: "deepseek/deepseek-chat-v3-0324:free",
+          model: "deepseek/deepseek-v4-flash:free",
           messages: [
             { role: "system", content: judgeSystemPrompt },
             { role: "user", content: judgeUserPrompt }
