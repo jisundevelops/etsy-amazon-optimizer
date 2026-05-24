@@ -11,15 +11,29 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Product name and Key features are required." });
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "OpenRouter API key is not configured." });
+    const groqKey = process.env.GROQ_API_KEY;
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+
+    if (!groqKey && !openrouterKey) {
+      return res.status(500).json({ error: "No AI API key configured." });
     }
 
     const MODELS = {
-      "deepseek-v4-flash": "deepseek/deepseek-v4-flash:free",
-      "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct:free",
-      "qwen3-32b": "qwen/qwen3-next-80b-a3b-instruct:free"
+      "deepseek-v4-flash": {
+        groq: "deepseek-r1-distill-llama-70b",
+        openrouter: "deepseek/deepseek-v4-flash:free",
+        name: "DeepSeek V4 Flash"
+      },
+      "llama-3.3-70b": {
+        groq: "llama-3.3-70b-versatile",
+        openrouter: "meta-llama/llama-3.3-70b-instruct:free",
+        name: "Llama 3.3 70B"
+      },
+      "qwen3-32b": {
+        groq: "qwen/qwen3-32b",
+        openrouter: "qwen/qwen3-next-80b-a3b-instruct:free",
+        name: "Qwen3 Next 80B"
+      }
     };
 
     const systemPrompt = `You are an expert Etsy and Amazon SEO specialist. Generate optimized product listings that rank high in search.
@@ -46,73 +60,111 @@ Platform: ${platform || "Both"}
 
 Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
 
-    // Run all 3 models in parallel
     const modelEntries = Object.entries(MODELS);
-    
+
+    // Helper: call a single model on Groq or OpenRouter
+    async function callModel(modelKey, modelConfig) {
+      // Try Groq first
+      if (groqKey) {
+        try {
+          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${groqKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: modelConfig.groq,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 2048,
+              response_format: { type: "json_object" }
+            })
+          });
+
+          if (groqRes.ok) {
+            const data = await groqRes.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) {
+              let clean = content.trim();
+              if (clean.startsWith('```')) {
+                clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+              }
+              const parsed = JSON.parse(clean.trim());
+              if (parsed.title && parsed.description && parsed.tags) {
+                return { model: modelKey, ...parsed, provider: "Groq" };
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Groq failed for ${modelKey}:`, e.message);
+        }
+      }
+
+      // Fallback to OpenRouter
+      if (openrouterKey) {
+        try {
+          const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openrouterKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://etsy-amazon-optimizer.vercel.app",
+              "X-Title": "Etsy & Amazon Listing Optimizer"
+            },
+            body: JSON.stringify({
+              model: modelConfig.openrouter,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 2048
+            })
+          });
+
+          if (orRes.ok) {
+            const data = await orRes.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (content) {
+              let clean = content.trim();
+              if (clean.startsWith('```')) {
+                clean = clean.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+              }
+              const parsed = JSON.parse(clean.trim());
+              if (parsed.title && parsed.description && parsed.tags) {
+                return { model: modelKey, ...parsed, provider: "OpenRouter" };
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`OpenRouter failed for ${modelKey}:`, e.message);
+        }
+      }
+
+      throw new Error(`Both providers failed for ${modelConfig.name}`);
+    }
+
+    // Run all 3 models in parallel
     const results = await Promise.allSettled(
-      modelEntries.map(async ([modelKey, modelId]) => {
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://etsy-amazon-optimizer.vercel.app",
-            "X-Title": "Etsy & Amazon Listing Optimizer"
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2048
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData?.error?.message || `API error for ${modelKey}`);
-        }
-
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-
-        if (!content) {
-          throw new Error(`No response from ${modelKey}`);
-        }
-
-        // Strip markdown code blocks if present
-        let cleanContent = content.trim();
-        if (cleanContent.startsWith('```')) {
-          cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-        }
-        const parsed = JSON.parse(cleanContent.trim());
-
-        if (!parsed.title || !parsed.description || !parsed.tags) {
-          throw new Error(`Invalid format from ${modelKey}`);
-        }
-
-        return { model: modelKey, ...parsed };
-      })
+      modelEntries.map(([key, config]) => callModel(key, config))
     );
 
-    // Collect successful results
-    const successfulResults = results
-      .map((r, i) => {
-        if (r.status === "fulfilled") {
-          return r.value;
-        }
-        return { model: modelEntries[i][0], error: r.reason?.message || "Failed" };
-      });
+    const successfulResults = results.map((r, i) => {
+      if (r.status === "fulfilled") return r.value;
+      return { model: modelEntries[i][0], error: r.reason?.message || "Failed" };
+    });
 
     const validResults = successfulResults.filter(r => !r.error);
 
     if (validResults.length === 0) {
-      throw new Error("All three AI models failed to generate listings. Please try again.");
+      throw new Error("All three AI models failed. Please check your API keys (GROQ_API_KEY and/or OPENROUTER_API_KEY) in Vercel environment variables.");
     }
 
-    // Now use an AI to pick the best one
+    // --- AI JUDGE ---
     const judgeSystemPrompt = `You are an expert SEO judge for Etsy and Amazon product listings. You evaluate listings based on:
 1. Title quality: keyword-rich, under 140 chars, compelling for buyers
 2. Description quality: professional, SEO-focused, 150-200 words, persuasive
@@ -143,27 +195,51 @@ Score each listing (0-100) for title, description, tags, and overall. Pick the b
 
     let bestPick = null;
     try {
-      const judgeResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://etsy-amazon-optimizer.vercel.app",
-          "X-Title": "Etsy & Amazon Listing Optimizer"
-        },
-        body: JSON.stringify({
-          model: "deepseek/deepseek-v4-flash:free",
-          messages: [
-            { role: "system", content: judgeSystemPrompt },
-            { role: "user", content: judgeUserPrompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 1024
-        })
-      });
+      // Use Groq for judge (fast & free) if available, otherwise OpenRouter
+      const judgeProvider = groqKey ? "groq" : "openrouter";
+      let judgeRes;
 
-      if (judgeResponse.ok) {
-        const judgeData = await judgeResponse.json();
+      if (groqKey) {
+        judgeRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${groqKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              { role: "system", content: judgeSystemPrompt },
+              { role: "user", content: judgeUserPrompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 1024,
+            response_format: { type: "json_object" }
+          })
+        });
+      } else if (openrouterKey) {
+        judgeRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openrouterKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://etsy-amazon-optimizer.vercel.app",
+            "X-Title": "Etsy & Amazon Listing Optimizer"
+          },
+          body: JSON.stringify({
+            model: "deepseek/deepseek-v4-flash:free",
+            messages: [
+              { role: "system", content: judgeSystemPrompt },
+              { role: "user", content: judgeUserPrompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 1024
+          })
+        });
+      }
+
+      if (judgeRes && judgeRes.ok) {
+        const judgeData = await judgeRes.json();
         const judgeContent = judgeData.choices?.[0]?.message?.content;
         if (judgeContent) {
           let judgeClean = judgeContent.trim();

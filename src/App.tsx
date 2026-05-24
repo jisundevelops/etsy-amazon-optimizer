@@ -264,7 +264,7 @@ export default function App() {
         </div>
         <div className="flex items-center space-x-2 text-xs opacity-90 z-10 mt-3 sm:mt-0 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
           <span className="w-2 h-2 rounded-full bg-[#00B67A] animate-pulse"></span>
-          <span className="text-slate-300 font-mono">OpenRouter • 3 AI Models</span>
+          <span className="text-slate-300 font-mono">Groq + OpenRouter • 3 AI Models</span>
         </div>
       </header>
 
@@ -707,7 +707,7 @@ export default function App() {
       {/* FOOTER */}
       <footer className="mt-20 border-t border-slate-200 pt-8 text-center px-4 max-w-6xl mx-auto w-full">
         <p className="text-xs text-slate-400 font-medium">
-          Multi-AI SEO Optimizer • DeepSeek V4 Flash • Llama 3.3 70B • Qwen3 Next 80B • Powered by OpenRouter
+          Multi-AI SEO Optimizer • DeepSeek V4 Flash • Llama 3.3 70B • Qwen3 Next 80B • Powered by Groq + OpenRouter
         </p>
         <p className="text-[10px] text-slate-300 mt-2 font-mono">
           Etsy & Amazon Listing Optimizer • {new Date().getFullYear()}

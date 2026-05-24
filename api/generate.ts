@@ -11,15 +11,32 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Product name and Key features are required." });
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "OpenRouter API key is not configured. Please set OPENROUTER_API_KEY environment variable in Vercel." });
+    // --- PROVIDER CONFIG ---
+    // Groq is the primary (truly free: 14,400 req/day, fast)
+    const groqKey = process.env.GROQ_API_KEY;
+    // OpenRouter is the fallback
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+
+    if (!groqKey && !openrouterKey) {
+      return res.status(500).json({ error: "No AI API key configured. Please set GROQ_API_KEY or OPENROUTER_API_KEY in Vercel environment variables." });
     }
 
     const MODEL_MAP = {
-      "deepseek-v4-flash": "deepseek/deepseek-v4-flash:free",
-      "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct:free",
-      "qwen3-32b": "qwen/qwen3-next-80b-a3b-instruct:free"
+      "deepseek-v4-flash": {
+        groq: "deepseek-r1-distill-llama-70b",
+        openrouter: "deepseek/deepseek-v4-flash:free",
+        name: "DeepSeek V4 Flash"
+      },
+      "llama-3.3-70b": {
+        groq: "llama-3.3-70b-versatile",
+        openrouter: "meta-llama/llama-3.3-70b-instruct:free",
+        name: "Llama 3.3 70B"
+      },
+      "qwen3-32b": {
+        groq: "qwen/qwen3-32b",
+        openrouter: "qwen/qwen3-next-80b-a3b-instruct:free",
+        name: "Qwen3 Next 80B"
+      }
     };
 
     const selectedModel = MODEL_MAP[model] || MODEL_MAP["deepseek-v4-flash"];
@@ -48,59 +65,104 @@ Platform: ${platform || "Both"}
 
 Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://etsy-amazon-optimizer.vercel.app",
-        "X-Title": "Etsy & Amazon Listing Optimizer"
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 2048
-      })
-    });
+    // --- TRY GROQ FIRST ---
+    if (groqKey) {
+      try {
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${groqKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: selectedModel.groq,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 2048,
+            response_format: { type: "json_object" }
+          })
+        });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      const errorMsg = data?.error?.message || data?.error?.code || `OpenRouter API error: ${response.status}`;
-      const errorCode = data?.error?.code || '';
-      throw new Error(`OpenRouter error (${errorCode}): ${errorMsg} | Model: ${selectedModel}`);
-    }
-
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      // Check if provider returned an error inside a 200 response
-      const providerError = data?.error?.message || data?.choices?.[0]?.error?.message;
-      if (providerError) {
-        throw new Error(`Provider error: ${providerError} | Model: ${selectedModel}`);
+        if (groqResponse.ok) {
+          const groqData = await groqResponse.json();
+          const content = groqData.choices?.[0]?.message?.content;
+          if (content) {
+            let cleanContent = content.trim();
+            if (cleanContent.startsWith('```')) {
+              cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+            }
+            const jsonResponse = JSON.parse(cleanContent.trim());
+            if (jsonResponse.title && jsonResponse.description && jsonResponse.tags) {
+              return res.status(200).json({
+                ...jsonResponse,
+                model: model,
+                provider: "Groq"
+              });
+            }
+          }
+        }
+        // Groq failed, log and fall through to OpenRouter
+        const groqError = await groqResponse.json().catch(() => ({}));
+        console.error("Groq failed:", groqError?.error?.message || groqResponse.status);
+      } catch (groqErr) {
+        console.error("Groq error:", groqErr.message);
       }
-      throw new Error(`No response from model ${selectedModel}. Full response: ${JSON.stringify(data).slice(0, 300)}`);
     }
 
-    // Strip markdown code blocks if present
-    let cleanContent = content.trim();
-    if (cleanContent.startsWith('```')) {
-      cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-    }
-    const jsonResponse = JSON.parse(cleanContent.trim());
+    // --- FALLBACK TO OPENROUTER ---
+    if (openrouterKey) {
+      try {
+        const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openrouterKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://etsy-amazon-optimizer.vercel.app",
+            "X-Title": "Etsy & Amazon Listing Optimizer"
+          },
+          body: JSON.stringify({
+            model: selectedModel.openrouter,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 2048
+          })
+        });
 
-    if (!jsonResponse.title || !jsonResponse.description || !jsonResponse.tags) {
-      throw new Error("Invalid response format from AI model.");
+        const orData = await orResponse.json();
+
+        if (orResponse.ok) {
+          const content = orData.choices?.[0]?.message?.content;
+          if (content) {
+            let cleanContent = content.trim();
+            if (cleanContent.startsWith('```')) {
+              cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+            }
+            const jsonResponse = JSON.parse(cleanContent.trim());
+            if (jsonResponse.title && jsonResponse.description && jsonResponse.tags) {
+              return res.status(200).json({
+                ...jsonResponse,
+                model: model,
+                provider: "OpenRouter"
+              });
+            }
+          }
+        }
+
+        const orError = orData?.error?.message || `OpenRouter error: ${orResponse.status}`;
+        throw new Error(orError);
+      } catch (orErr) {
+        console.error("OpenRouter error:", orErr.message);
+        throw new Error(`Both AI providers failed. Groq: no key or error. OpenRouter: ${orErr.message}`);
+      }
     }
 
-    return res.status(200).json({
-      ...jsonResponse,
-      model: model
-    });
+    throw new Error("No working AI provider available. Please check your API keys.");
   } catch (error) {
     console.error("Error generating listing:", error);
     return res.status(500).json({ error: error.message || "An error occurred during listing generation." });
