@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
 export default async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== "POST") {
@@ -14,14 +12,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Product name and Key features are required." });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: "Gemini API key is not configured. Please set GEMINI_API_KEY environment variable in Vercel." });
+      return res.status(500).json({ error: "Groq API key is not configured. Please set GROQ_API_KEY environment variable in Vercel." });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const systemPrompt = `You are an expert Etsy and Amazon SEO specialist. Generate optimized product listings that rank high in search.
 
-    const prompt = `Generate an optimized listing for:
+You MUST respond with ONLY valid JSON in this exact format, no other text:
+{
+  "title": "optimized title here",
+  "description": "SEO description here",
+  "tags": ["tag1", "tag2", ...]
+}
+
+Rules:
+- title: keyword-rich, strictly under 140 characters
+- description: sales-driven, professional, SEO-focused, 150-200 words
+- tags: exactly 13 tags, each under 20 characters, optimized for search`;
+
+    const userPrompt = `Generate an optimized listing for:
 Product: ${productName}
 Category: ${category || "Other"}
 Features: ${features}
@@ -29,47 +39,47 @@ Audience: ${audience || "general buyers"}
 Price: ${price || "N/A"}
 Platform: ${platform || "Both"}
 
-Return ONLY valid JSON matching the schema requirements. Ensure:
-1. Title is under 140 characters, keyword-rich, and optimized for search.
-2. Description is compelling, professional, SEO-focused, and 150-200 words.
-3. Tags includes exactly 13 tags, each under 20 characters, optimized for search engines.`;
+Return ONLY valid JSON. No markdown, no code blocks, no explanation.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: "You are an expert Etsy and Amazon SEO specialist. Generate optimized product listings that rank high in search.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: {
-              type: Type.STRING,
-              description: "Optimized keyword-rich listing title, strictly under 140 characters."
-            },
-            description: {
-              type: Type.STRING,
-              description: "Sales-driven SEO description, containing 150 to 200 words."
-            },
-            tags: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.STRING,
-              },
-              description: "Exactly 13 tags, optimized for SEO search queries, each strictly under 20 characters."
-            }
-          },
-          required: ["title", "description", "tags"]
-        }
-      }
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2048,
+        response_format: { type: "json_object" }
+      })
     });
 
-    const resultText = response.text;
-    if (!resultText) {
-      throw new Error("No response received from Gemini model.");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData?.error?.message || `Groq API error: ${response.status}`;
+      throw new Error(errorMessage);
     }
 
-    const jsonResponse = JSON.parse(resultText.trim());
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("No response received from AI model.");
+    }
+
+    // Parse the JSON response
+    const jsonResponse = JSON.parse(content.trim());
+
+    // Validate the response has required fields
+    if (!jsonResponse.title || !jsonResponse.description || !jsonResponse.tags) {
+      throw new Error("Invalid response format from AI model.");
+    }
+
     return res.status(200).json(jsonResponse);
   } catch (error) {
     console.error("Error generating listing:", error);

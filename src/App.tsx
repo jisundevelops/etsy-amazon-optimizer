@@ -209,7 +209,7 @@ ${result.tags.join(", ")}`;
         
         <div className="flex items-center space-x-2 text-xs opacity-90 z-10 mt-3 sm:mt-0 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
           <span className="w-2 h-2 rounded-full bg-[#00B67A] animate-pulse"></span>
-          <span className="text-slate-300 font-mono">Gemini 3.5 Flash Active</span>
+          <span className="text-slate-300 font-mono">Llama 3.3 70B via Groq Active</span>
         </div>
       </header>
 
@@ -645,7 +645,7 @@ ${result.tags.join(", ")}`;
       {/* FOOTER */}
       <footer className="mt-20 border-t border-slate-200 pt-8 text-center px-4 max-w-6xl mx-auto w-full">
         <p className="text-xs text-slate-400 font-medium">
-          Built adhering to Etsy character limits (140) and listing tags rules (exactly 13 chips). Powered securely by Google Gemini API.
+          Built adhering to Etsy character limits (140) and listing tags rules (exactly 13 chips). Powered by Groq (Llama 3.3 70B).
         </p>
         <p className="text-[10px] text-slate-300 mt-2 font-mono">
           Etsy & Amazon Listing Optimizer • {new Date().getFullYear()}
