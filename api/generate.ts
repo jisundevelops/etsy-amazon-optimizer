@@ -23,7 +23,7 @@ export default async function handler(req, res) {
 
     const MODEL_MAP = {
       "deepseek-v4-flash": {
-        groq: "deepseek-r1-distill-llama-70b",
+        groq: "llama-3.3-70b-versatile",
         openrouter: "deepseek/deepseek-v4-flash:free",
         name: "DeepSeek V4 Flash"
       },
